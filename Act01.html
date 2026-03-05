@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مغامرة برمجة Rover - المساعد الذكي</title>
+    <style>
+        :root {
+            --space-bg: #0b0d17;
+            --rover-green: #27ae60;
+            --mars-red: #e74c3c;
+            --star-gold: #f1c40f;
+            --text-white: #ffffff;
+            --pop-bg: rgba(20, 30, 48, 0.95);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--space-bg);
+            background-image: radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 40px);
+            background-size: 550px 550px;
+            color: var(--text-white);
+            margin: 0; padding: 20px;
+            display: flex; justify-content: center; align-items: flex-start;
+            min-height: 100vh; overflow-y: auto;
+        }
+
+        .game-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            padding: 20px; border-radius: 25px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            width: 100%; max-width: 750px;
+            text-align: center; margin-bottom: 50px;
+        }
+
+        .star-rating { font-size: 25px; margin-bottom: 10px; color: #444; }
+        .star-active { color: var(--star-gold); text-shadow: 0 0 8px var(--star-gold); }
+
+        .drop-zone {
+            min-height: 300px; max-height: 500px; overflow-y: auto;
+            border: 3px dashed var(--star-gold); border-radius: 20px;
+            margin: 15px auto; display: flex; flex-direction: column;
+            align-items: center; gap: 12px; padding: 20px;
+            background: rgba(0, 0, 0, 0.4); width: 90%;
+        }
+
+        .pieces-container {
+            display: flex; flex-wrap: wrap; justify-content: center;
+            gap: 10px; padding: 15px; background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+        }
+
+        .piece {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white; padding: 12px 15px; border-radius: 10px;
+            cursor: grab; font-weight: bold; font-size: 0.9rem;
+            width: fit-content; max-width: 90%;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        #rover-avatar { font-size: 45px; margin-bottom: 5px; display: inline-block; }
+
+        /* تصميم نافذة البوب أب (Pop-up) */
+        .modal {
+            display: none; position: fixed; z-index: 2000;
+            left: 0; top: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            justify-content: center; align-items: center;
+        }
+
+        .modal-content {
+            background: var(--pop-bg); padding: 30px;
+            border: 2px solid var(--star-gold); border-radius: 20px;
+            width: 80%; max-width: 400px; text-align: center;
+            box-shadow: 0 0 30px rgba(241, 196, 15, 0.3);
+            animation: popAnim 0.3s ease-out;
+        }
+
+        @keyframes popAnim { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .btn-reset { background: #636e72; color: white; }
+        .btn-show { background: var(--star-gold); color: #333; }
+        .btn-close { background: var(--mars-red); color: white; margin-top: 15px; }
+
+        .badge-win { width: 120px; height: 120px; background: var(--star-gold); border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 5px solid #fff; color: #333; margin: 0 auto; }
+        
+        .balloon { position: fixed; z-index: 1000; font-size: 24px; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+<div id="helpModal" class="modal">
+    <div class="modal-content">
+        <h3 style="color: var(--star-gold);">💡 تلميح المبرمج الذكي</h3>
+        <p id="helpText" style="line-height: 1.6;"></p>
+        <button class="btn btn-close" onclick="closeHelp()">فهمت، سأحاول!</button>
+    </div>
+</div>
+
+<div class="game-container">
+    <div id="rover-avatar">🤖</div>
+    <div class="star-rating">
+        <span id="s1">⭐</span> <span id="s2">⭐</span> <span id="s3">⭐</span>
+    </div>
+    
+    <h2>مهمة المبرمج الصغير 🚀</h2>
+    <p>ساعد Rover في رحلته عبر ترتيب خطوات البرمجة!</p>
+
+    <div class="drop-zone" id="dropZone">
+        <div id="placeholder" style="color: #ccc; margin-top: 50px;">اسحب الخطوة الأولى هنا...</div>
+    </div>
+
+    <div class="pieces-container" id="piecesBox">
+        <div class="piece" draggable="true" id="st5" data-step="5">من القائمة المستديرة اختر keyboard (لوحة المفاتيح)</div>
+        <div class="piece" draggable="true" id="st1" data-step="1">اختر Object tool (أداة الكائن)</div>
+        <div class="piece" draggable="true" id="st3" data-step="3">اختر Program (برمجة) من الخيارات</div>
+        <div class="piece" draggable="true" id="st7" data-step="7">من القائمة المستديرة اختر Arrows (الأسهم)</div>
+        <div class="piece" draggable="true" id="st2" data-step="2">اضغط بزر الفأرة الأيمن على Object Rover</div>
+        <div class="piece" draggable="true" id="st4" data-step="4">اضغط على إشارة (+) الموجودة في مربع WHEN</div>
+        <div class="piece" draggable="true" id="st6" data-step="6">اضغط على إشارة (+) المجاورة لـ Keyboard</div>
+    </div>
+
+    <div id="win-display" style="display: none; padding: 20px;">
+        <div class="badge-win">
+            <span style="font-size: 50px;">🏆</span>
+            <span style="font-size: 14px; font-weight: bold;">خبير برمجة</span>
+        </div>
+        <h3 style="color: var(--star-gold);">مبروك! تم تجهيز الشرط بنجاح.</h3>
+        <button class="btn btn-reset" onclick="location.reload()">العب مجدداً 🔄</button>
+    </div>
+
+    <div class="controls" id="controlButtons">
+        <button class="btn btn-reset" onclick="location.reload()">إعادة 🔄</button>
+        <button class="btn btn-show" onclick="openHelp()">مساعدة 💡</button>
+    </div>
+</div>
+
+<script>
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function beep(f, t, d) {
+        const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+        o.type = t; o.frequency.value = f; g.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(); o.stop(audioCtx.currentTime + d);
+    }
+
+    let currentStep = 1;
+    const hints = {
+        1: "للبدء، نحتاج أولاً لاختيار 'الأداة' المخصصة للإمساك بالكائنات.. هل تعرفها؟",
+        2: "ممتاز! الآن اضغط بزر الفأرة الأيمن على العربة Rover لنفتح قائمة الإعدادات.",
+        3: "داخل القائمة، ابحث عن كلمة تعني 'برمجة' لتبدأ بكتابة الأكواد.",
+        4: "الآن بدأت الإثارة! اضغط على علامة (+) بداخل المربع الذي يسأل: 'متى (WHEN)' سيبدأ الفعل؟",
+        5: "نريد التحكم عبر الجهاز.. اختر 'لوحة المفاتيح' من القائمة الدائرية.",
+        6: "بجانب كلمة لوحة المفاتيح، اضغط على علامة (+) لنحدد المفاتيح المطلوبة.",
+        7: "الخطوة الأخيرة! اختر 'الأسهم' ليتحرك الروبوت في جميع الاتجاهات."
+    };
+
+    function openHelp() {
+        const helpText = document.getElementById('helpText');
+        helpText.innerText = hints[currentStep] || "لقد أتممت جميع الخطوات بنجاح! أنت مبرمج رائع.";
+        document.getElementById('helpModal').style.display = 'flex';
+        beep(800, 'sine', 0.1);
+    }
+
+    function closeHelp() {
+        document.getElementById('helpModal').style.display = 'none';
+    }
+
+    document.querySelectorAll('.piece').forEach(p => {
+        p.addEventListener('dragstart', (e) => {
+            beep(600, 'sine', 0.1);
+            e.dataTransfer.setData('text', e.target.id);
+        });
+    });
+
+    const dropZone = document.getElementById('dropZone');
+    dropZone.addEventListener('dragover', (e) => e.preventDefault());
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const id = e.dataTransfer.getData('text');
+        const pc = document.getElementById(id);
+        const s = parseInt(pc.getAttribute('data-step'));
+
+        if (s === currentStep) {
+            beep(1000, 'sine', 0.2);
+            if(currentStep === 1) document.getElementById('placeholder').style.display = 'none';
+            dropZone.appendChild(pc);
+            pc.draggable = false; pc.style.width = "90%";
+            pc.style.background = "linear-gradient(135deg, #27ae60, #2ecc71)";
+            
+            if(currentStep === 2) document.getElementById('s1').classList.add('star-active');
+            if(currentStep === 4) document.getElementById('s2').classList.add('star-active');
+            if(currentStep === 6) document.getElementById('s3').classList.add('star-active');
+
+            currentStep++;
+            if(currentStep > 7) {
+                document.getElementById('piecesBox').style.display = 'none';
+                document.getElementById('controlButtons').style.display = 'none';
+                document.getElementById('win-display').style.display = 'block';
+            }
+            dropZone.scrollTop = dropZone.scrollHeight;
+        } else {
+            beep(200, 'sawtooth', 0.4);
+            createBalloons(false);
+        }
+    });
+
+    function createBalloons(pos) {
+        for(let i=0; i<6; i++) {
+            const b = document.createElement('div');
+            b.className = 'balloon';
+            b.style.left = Math.random() * 100 + 'vw';
+            b.style.top = '100vh';
+            b.innerText = pos ? '⭐' : '❌';
+            document.body.appendChild(b);
+            b.animate([{top: '100vh'}, {top: '-10vh'}], {duration: 2000, easing: 'linear'});
+            setTimeout(() => b.remove(), 2500);
+        }
+    }
+</script>
+</body>
+</html>
